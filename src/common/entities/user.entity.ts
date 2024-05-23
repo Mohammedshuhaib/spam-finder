@@ -40,7 +40,7 @@ export class Users {
   password: string;
 
   @Column()
-  is_spam: string;
+  is_spam: boolean;
 
   @Column()
   refresh_token: string;

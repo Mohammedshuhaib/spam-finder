@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
     name TEXT NOT NULL DEFAULT '',
     email TEXT UNIQUE NOT NULL DEFAULT '',
-    phone_number TEXT NOT NULL DEFAULT '',
+    phone_number TEXT NOT NULL UNIQUE DEFAULT '',
     password TEXT NOT NULL DEFAULT '',
 	created_by int NULL REFERENCES users (id),
     refresh_token TEXT NOT NULL DEFAULT '',

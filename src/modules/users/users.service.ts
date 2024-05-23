@@ -2,10 +2,14 @@ import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { DataSource, QueryRunner } from 'typeorm';
-import { CreateUserDto, LoginUserDto } from './dto/users.dto';
+import {
+  CreateContactDto,
+  CreateUserDto,
+  LoginUserDto,
+  UpdateContactDto,
+} from './dto/users.dto';
 import * as bcrypt from 'bcrypt';
 import { Users } from 'src/common/entities';
-
 
 @Injectable()
 export class UsersService {
@@ -62,7 +66,8 @@ export class UsersService {
   async register(registerData: CreateUserDto) {
     try {
       registerData.password = await this.hashData(registerData.password);
-      registerData.email = registerData.email.toLowerCase();
+      registerData.email =
+        registerData.email && registerData.email.toLowerCase();
       const userData = await this.queryRunner.manager
         .getRepository(Users)
         .create(registerData);
@@ -137,6 +142,115 @@ export class UsersService {
         error_message: null,
       };
     } catch (error) {
+      throw new HttpException(error.message, error.code || error.status);
+    }
+  }
+
+  async createContact(contactData: CreateContactDto, userId: string) {
+    try {
+      contactData.email = contactData.email && contactData.email.toLowerCase();
+      const userData = await this.queryRunner.manager
+        .getRepository(Users)
+        .create(contactData);
+      userData.created_by = userId;
+      userData.password = '***';
+      const response = await this.queryRunner.manager
+        .getRepository(Users)
+        .save(userData);
+      return {
+        status: 'success',
+        message: 'Successfully created contacts',
+        data: { ...response },
+        error: null,
+        error_message: null,
+      };
+    } catch (error) {
+      throw new HttpException(error.message, error.code || error.status);
+    }
+  }
+
+  async refreshTokens(userId: string, refreshToken: string) {
+    const user = await this.queryRunner.manager.getRepository(Users).findOneBy({
+      id: userId,
+    });
+    if (!user || !user.refresh_token)
+      throw new HttpException('Access Denied', HttpStatus.FORBIDDEN);
+    const refreshTokenMatches = await bcrypt.compare(
+      refreshToken,
+      user.refresh_token,
+    );
+    if (!refreshTokenMatches)
+      throw new HttpException('Access Denied', HttpStatus.FORBIDDEN);
+    const tokens = await this.getTokens(user.id, user.email);
+    await this.updateRefreshToken(user.id, tokens.refreshToken);
+    return {
+      status: 'success',
+      message: 'Successfully created access token',
+      data: tokens,
+      error: null,
+      error_message: null,
+    };
+  }
+
+  async getContacts(tableColumn: any) {
+    try {
+      const response = await this.queryRunner.manager
+        .getRepository(Users)
+        .find({ where: { ...tableColumn } });
+      return {
+        status: 'success',
+        message: 'Successfully fetched contacts',
+        data: response,
+        error: null,
+        error_message: null,
+      };
+    } catch (error) {
+      throw new HttpException(error.message, error.code || error.status);
+    }
+  }
+
+  async updateSpam(contactId: string, updateData: UpdateContactDto) {
+    try {
+      const response = await this.queryRunner.manager
+        .getRepository(Users)
+        .createQueryBuilder()
+        .update({ ...updateData })
+        .where({ id: contactId })
+        .returning('*')
+        .execute();
+      return {
+        status: 'success',
+        message: 'Successfully updated spam',
+        data: response,
+        error: null,
+        error_message: null,
+      };
+    } catch (error) {
+      throw new HttpException(error.message, error.code || error.status);
+    }
+  }
+
+  async getSerachedContacts(serachText: string) {
+    try {
+      const response = await this.queryRunner.manager
+        .getRepository(Users)
+        .createQueryBuilder()
+        .where(serachText ? 'LOWER(name) LIKE LOWER(:query)' : 'true', {
+          query: `%${serachText}%`,
+        })
+        .orWhere(serachText ? 'LOWER(email) LIKE LOWER(:query)' : 'true', {
+          query: `%${serachText}%`,
+        })
+        .getMany();
+      return {
+        status: 'success',
+        message: 'successfully serached products',
+        data: response,
+        error: null,
+        error_message: null,
+      };
+    } catch (error) {
+      console.log(error);
       throw new HttpException(error.message, error.code || error.status);
     }
   }
